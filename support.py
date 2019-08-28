@@ -2,12 +2,9 @@ import os
 import sys
 import time
 import retro.data
-import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 
-from matplotlib import animation
-from IPython.display import display
 
 import tempfile
 from zipfile import ZipFile
