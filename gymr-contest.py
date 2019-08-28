@@ -27,7 +27,7 @@ from support import save_frames_as_gif, install_games_from_rom_dir, download_and
 from sonic_util import make_env
 
 
-BATCH_SIZE = 512
+BATCH_SIZE = 128
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
@@ -97,7 +97,7 @@ class DQN(nn.Module):
         logits = self.forward(x.to(device))
         # logits = F.softmax(logits)
         indices = torch.argmax(logits, dim=1)
-        return indices.to(device)
+        return torch.tensor([[indices.to(device)]])
 
 
 # use replay to handle image transitions
@@ -182,11 +182,11 @@ def select_action(state, bias_list=None):
         # print("random action")
         # check if there's a bias towards any specific action
         if bias_list:
-            selected_action = torch.tensor(np.random.choice(
-                NUMBER_GAME_BUTTONS, 1, p=bias_list), device=device, dtype=torch.long)
+            selected_action = torch.tensor([np.random.choice(
+                NUMBER_GAME_BUTTONS, 1, p=bias_list)], device=device, dtype=torch.long)
         else:
             selected_action = torch.tensor(
-                [random.randrange(NUMBER_GAME_BUTTONS)], device=device, dtype=torch.long)
+                [[random.randrange(NUMBER_GAME_BUTTONS)]], device=device, dtype=torch.long)
     # print(f"selected action {selected_action}")
     return selected_action
 
@@ -210,6 +210,11 @@ def optimize_model():
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
+
+    print("state_batch", state_batch.shape)
+    print("action_batch", action_batch.shape)
+    print("reward_batch", reward_batch.shape)
+
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken
@@ -263,6 +268,7 @@ def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=
 
             # Select and perform an action
             action = select_action(state, SELECT_ACTION_BIAS_LIST)
+            print("action", action)
             if display_action:
                 print("action: ", action.squeeze())
             observation, reward, done, info = env.step(action)
@@ -346,7 +352,7 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
 optimizer = optim.RMSprop(policy_net.parameters())
-memory = ReplayMemory(10)
+memory = ReplayMemory(BATCH_SIZE)
 
 
 steps_done = 0
