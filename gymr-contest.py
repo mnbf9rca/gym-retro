@@ -291,6 +291,8 @@ def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=
             if done or t > max_steps:
                 episode_durations.append(t + 1)
                 print(f'{{"metric": "score", "value": {total_reward}, "epoch": {i_episode+1}}}')
+                print(f'{{"metric": "total steps", "value": {steps_done}, "epoch": {i_episode+1}}}')
+                print(f'{{"metric": "steps this episode", "value": {t}, "epoch": {i_episode+1}}}')
                 observation = env.reset()
                 # frames.append(observation)
                 # now = datetime.now() # current date and time
