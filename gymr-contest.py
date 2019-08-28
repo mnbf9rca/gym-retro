@@ -28,11 +28,13 @@ from sonic_util import make_env
 
 
 BATCH_SIZE = 64
+REPLAY_CAPACITY = 1000
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
 EPS_DECAY = 50000  # how many steps does it take before EPS is zero? - across episodes...
 TARGET_UPDATE = 10
+IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 NUMBER_GAME_BUTTONS = 5
@@ -58,7 +60,7 @@ DS_PATH = 'roms/'  # edit with your path/to/rom
 install_games_from_rom_dir(DS_PATH)
 
 
-class DQN(nn.Module):
+class DQN_old(nn.Module):
 
     def __init__(self):
         super(DQN, self).__init__()
@@ -77,9 +79,8 @@ class DQN(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2))
         self.drop_out = nn.Dropout()
         self.fc1 = nn.Sequential(
-            nn.Linear(32000, 1000),
-            nn.Linear(1000, 1000),
-            nn.Linear(1000, NUMBER_GAME_BUTTONS))
+            nn.Linear(32000, 2000),
+            nn.Linear(2000, NUMBER_GAME_BUTTONS))
 
         # self.head = nn.Linear(12, 12) # 12 possible actions in sonic 2
 
@@ -99,15 +100,41 @@ class DQN(nn.Module):
         return torch.argmax(logits, dim=1)
 
 
+class DQN(nn.Module):
+
+    def __init__(self, h, w):
+        super(DQN, self).__init__()
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=5, stride=2)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
+        self.bn3 = nn.BatchNorm2d(32)
+
+        # Number of Linear input connections depends on output of conv2d layers
+        # and therefore the input image size, so compute it.
+        def conv2d_size_out(size, kernel_size=5, stride=2):
+            return (size - (kernel_size - 1) - 1) // stride + 1
+
+        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
+        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
+        linear_input_size = convw * convh * 32
+        self.head = nn.Linear(linear_input_size, NUMBER_GAME_BUTTONS)
+
+    # Called with either one element to determine next action, or a batch
+    # during optimization. Returns tensor([[left0exp,right0exp]...]).
+    def forward(self, x):
+
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        return self.head(x.view(x.size(0), -1))
+
+
 # use replay to handle image transitions
-
-# In[15]:
-
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
-
-
 class ReplayMemory(object):
 
     def __init__(self, capacity):
@@ -132,7 +159,7 @@ class ReplayMemory(object):
 # In[17]:
 resize = T.Compose([T.ToPILImage(),
                     T.Grayscale(),
-                    T.Resize((320, 320)),
+                    T.Resize((IMAGE_RESIZED_TO, IMAGE_RESIZED_TO)),
                     T.ToTensor()])
 
 # notes on output image dimensions/tensor layout
@@ -158,7 +185,7 @@ def get_screen():
     screen = resize(screen)
     # plot_image(screen.cpu().numpy().squeeze())
 
-    return screen.unsqueeze(0)
+    return screen.unsqueeze(0).to(device)
 
 
 def select_action(state, bias_list=None):
@@ -167,7 +194,6 @@ def select_action(state, bias_list=None):
     adapted from udacity
     '''
     global steps_done
-    # print("selecting action")
     sample = random.random()
     eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * steps_done / EPS_DECAY)
     steps_done += 1
@@ -175,8 +201,11 @@ def select_action(state, bias_list=None):
     if sample > eps_threshold:
         with torch.no_grad():
             # print("using net")
-            # return policy_net(state).max(1)[1].view(1, 1)
-            selected_action = policy_net.predict(state.to(device)).view(1,1)
+            # t.max(1) will return largest column value of each row.
+            # second column on max result is index of where max element was
+            # found, so we pick action with the larger expected reward.
+            selected_action = policy_net(state).max(1)[1].view(1, 1)
+            # selected_action = policy_net.predict(state.to(device)).view(1,1)
     else:
         # print("random action")
         # check if there's a bias towards any specific action
@@ -195,7 +224,7 @@ def optimize_model():
     performs a backward pass
     '''
     if len(memory) < BATCH_SIZE:
-        return
+        return None
     transitions = memory.sample(BATCH_SIZE)
     # Transpose the batch (see http://stackoverflow.com/a/19343/3343043 for
     # detailed explanation).
@@ -203,14 +232,12 @@ def optimize_model():
 
     # Compute a mask of non-final states and concatenate the batch elements
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                            batch.next_state)), device=device, dtype=torch.uint8)
+                                            batch.next_state)), device=device, dtype=torch.uint8)  # will throw error on torch > 1.2
     non_final_next_states = torch.cat([s for s in batch.next_state
                                        if s is not None])
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
-
-
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken
@@ -224,7 +251,6 @@ def optimize_model():
 
     # Compute Huber loss
     loss = F.smooth_l1_loss(state_action_values, expected_state_action_values.unsqueeze(1))
-    print('{{"metric": "loss", "value": {}}}'.format(loss))
 
     # Optimize the model
     optimizer.zero_grad()
@@ -232,12 +258,10 @@ def optimize_model():
     for param in policy_net.parameters():
         param.grad.data.clamp_(-1, 1)
     optimizer.step()
-
-
-# In[21]:
-
+    return
 
 # wrap the main training loop in a definition
+
 
 frames = []
 
@@ -253,24 +277,19 @@ def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=
     for i_episode in range(num_episodes):
         # Initialize the environment and state
         env.reset()
-        last_screen = get_screen().to(device)
-        current_screen = get_screen().to(device)
+        last_screen = get_screen()
+        current_screen = get_screen()
         state = current_screen - last_screen
-        iteration_counter = 0
-        dt_last_iteration = datetime.now()
-        t_last = 0
         total_reward = 0
+        episode_start_time = datetime.now()
         for t in count():
-
             # Select and perform an action
             action = select_action(state, SELECT_ACTION_BIAS_LIST)
             # "action", action)
             if display_action:
                 print("action: ", action.squeeze())
-            observation, reward, done, info = env.step(action)
+            _, reward, done, _ = env.step(action)
             total_reward += reward * 100
-
-            # frames.append(observation) # collecting observation
 
             reward = torch.tensor([reward], device=device)
 
@@ -279,11 +298,12 @@ def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=
             current_screen = get_screen().to(device)
             if not done:
                 next_state = current_screen - last_screen
+                next_state = next_state.detach()
             else:
                 next_state = None
 
             # Store the transition in memory
-            memory.push(state, action, next_state, reward)
+            memory.push(state.detach(), action.detach(), next_state, reward.detach())
 
             # Move to the next state
             state = next_state
@@ -292,30 +312,15 @@ def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=
             optimize_model()
             if done or t > max_steps:
                 episode_durations.append(t + 1)
+                episode_end_time = datetime.now()
+                episode_time = (episode_end_time - episode_start_time).total_seconds()
                 print(f'{{"metric": "score", "value": {total_reward}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "total steps", "value": {steps_done}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "steps this episode", "value": {t}, "epoch": {i_episode+1}}}')
+                print(f'{{"metric": "episode duration", "value": {episode_time}, "epoch": {i_episode+1}}}')
                 observation = env.reset()
-                # frames.append(observation)
-                # now = datetime.now() # current date and time
-                #date_time = now.strftime("%Y%d%Y-%H%M%S")
-                #save_frames_as_gif(frames, filename=f'sonic2-{date_time}.gif')
                 break
-            iteration_counter += 1
-            if iteration_counter >= report_every:
-                now = datetime.now()  # current date and time
-                compute_time = (now - dt_last_iteration).total_seconds()
-                t_this = t - t_last
-                its_per_sec = float(t_this) / compute_time
 
-                date_time = now.strftime("%Y-%d-%Y %H:%M:%S")
-                print(f"t@{date_time}: {t+1} ({its_per_sec} / sec at {compute_time} seconds)")
-                #date_time = now.strftime("%Y%d%Y-%H%M%S")
-                #save_frames_as_gif(frames, filename=f'sonic2-{date_time}.gif')
-                # frames.clear()
-                iteration_counter = 0
-                t_last = t
-                dr_last_iteration = now
         # Update the target network
         if i_episode % TARGET_UPDATE == 0:
             target_net.load_state_dict(policy_net.state_dict())
@@ -334,12 +339,13 @@ else:
     # limit episides, steps on CPU i.e. when testing locally
     num_episodes = 1
     max_steps = 500
+    BATCH_SIZE = 8
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"setting device to '{device}'")
 
 
-policy_net = DQN().to(device)
-target_net = DQN().to(device)
+policy_net = DQN(IMAGE_RESIZED_TO, IMAGE_RESIZED_TO).to(device)
+target_net = DQN(IMAGE_RESIZED_TO, IMAGE_RESIZED_TO).to(device)
 # print("Model's state_dict:")
 # for param_tensor in policy_net.state_dict():
 #     print(param_tensor, "\t", policy_net.state_dict()[param_tensor].size())
@@ -348,7 +354,7 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
 optimizer = optim.RMSprop(policy_net.parameters())
-memory = ReplayMemory(BATCH_SIZE)
+memory = ReplayMemory(REPLAY_CAPACITY)
 
 
 steps_done = 0

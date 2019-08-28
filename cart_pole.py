@@ -241,6 +241,7 @@ for i_episode in range(num_episodes):
     state = current_screen - last_screen
     for t in count():
         # Select and perform an action
+        print("state shape", state.shape)
         action = select_action(state)
         print("selected_action", action, type(action))
     
