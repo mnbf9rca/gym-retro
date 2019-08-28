@@ -27,7 +27,7 @@ from support import save_frames_as_gif, install_games_from_rom_dir, download_and
 from sonic_util import make_env
 
 
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
@@ -84,7 +84,7 @@ class DQN(nn.Module):
         # self.head = nn.Linear(12, 12) # 12 possible actions in sonic 2
 
     def forward(self, x):
-        out = x.to(device)
+        out = x
         out = self.layer1(out)
         out = self.layer2(out)
         out = out.reshape(out.size(0), -1)
@@ -94,10 +94,9 @@ class DQN(nn.Module):
 
     def predict(self, x):
         ''' This function for predicts classes by calculating the softmax '''
-        logits = self.forward(x.to(device))
+        logits = self.forward(x)
         # logits = F.softmax(logits)
-        indices = torch.argmax(logits, dim=1)
-        return torch.tensor([[indices.to(device)]])
+        return torch.argmax(logits, dim=1)
 
 
 # use replay to handle image transitions
@@ -177,7 +176,7 @@ def select_action(state, bias_list=None):
         with torch.no_grad():
             # print("using net")
             # return policy_net(state).max(1)[1].view(1, 1)
-            selected_action = policy_net.predict(state)
+            selected_action = policy_net.predict(state.to(device)).view(1,1)
     else:
         # print("random action")
         # check if there's a bias towards any specific action
@@ -211,9 +210,6 @@ def optimize_model():
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
 
-    print("state_batch", state_batch.shape)
-    print("action_batch", action_batch.shape)
-    print("reward_batch", reward_batch.shape)
 
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
@@ -268,7 +264,7 @@ def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=
 
             # Select and perform an action
             action = select_action(state, SELECT_ACTION_BIAS_LIST)
-            print("action", action)
+            # "action", action)
             if display_action:
                 print("action: ", action.squeeze())
             observation, reward, done, info = env.step(action)
