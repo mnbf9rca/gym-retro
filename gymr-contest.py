@@ -28,7 +28,7 @@ from sonic_util import make_env
 
 
 BATCH_SIZE = 64
-REPLAY_CAPACITY = 1000
+REPLAY_CAPACITY = 10000
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
@@ -38,8 +38,9 @@ IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 NUMBER_GAME_BUTTONS = 5
-num_episodes = 1000
+num_episodes = 300
 max_steps = 5000000  # per episode
+store_model = True
 # or None - bias random selection towards this value
 SELECT_ACTION_BIAS_LIST = [0.175, 0.3, 0.175, 0.175, 0.175]
 display_action = False
@@ -135,6 +136,8 @@ class DQN(nn.Module):
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
+
+
 class ReplayMemory(object):
 
     def __init__(self, capacity):
@@ -311,7 +314,6 @@ def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=
             # Perform one step of the optimization (on the target network)
             optimize_model()
             if done or t > max_steps:
-                episode_durations.append(t + 1)
                 episode_end_time = datetime.now()
                 episode_time = (episode_end_time - episode_start_time).total_seconds()
                 print(f'{{"metric": "score", "value": {total_reward}, "epoch": {i_episode+1}}}')
@@ -339,6 +341,7 @@ else:
     # limit episides, steps on CPU i.e. when testing locally
     num_episodes = 1
     max_steps = 500
+    store_model = False
     BATCH_SIZE = 8
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"setting device to '{device}'")
@@ -358,8 +361,6 @@ memory = ReplayMemory(REPLAY_CAPACITY)
 
 
 steps_done = 0
-episode_durations = []
-
 
 # close current environment if there is one (e.g. on failure to complete last time)
 try:
@@ -372,13 +373,16 @@ except NameError:
 env = make_env(GAME_NAME, LEVEL, True)
 report_every = max(max_steps/100, 100)
 
-dqn_training(num_episodes, max_steps=max_steps,
-             report_every=report_every, display_action=display_action)
+dqn_training(num_episodes,
+             max_steps=max_steps,
+             report_every=report_every,
+             display_action=display_action)
 
 
 # save models
-print('saving')
-date_time = datetime.now().strftime("%Y%d%Y-%H%M%S")
-torch.save(target_net.state_dict(), f'models/target_net-{GAME_NAME}-{date_time}.pt')
-torch.save(policy_net.state_dict(), f'models/policy_net-{GAME_NAME}-{date_time}.pt')
-print('saved')
+if store_model:
+    print('saving')
+    date_time = datetime.now().strftime("%Y%d%Y-%H%M%S")
+    torch.save(target_net.state_dict(), f'models/target_net-{GAME_NAME}-{date_time}.pt')
+    torch.save(policy_net.state_dict(), f'models/policy_net-{GAME_NAME}-{date_time}.pt')
+    print('saved')
