@@ -20,6 +20,7 @@ def make_env(game_name, game_level, scale_rew=True):
         record=True)  # Record the Run
     env = SonicDiscretizer(env)
     if scale_rew:
+        print("scaling rewards")
         env = RewardScaler(env)
     # env = WarpFrame(env)
     # if stack:
@@ -82,7 +83,7 @@ class RewardScaler(gym.RewardWrapper):
     """
 
     def reward(self, reward):
-        return reward * 0.01
+        return reward * 0.1
 
 
 class AllowBacktracking(gym.Wrapper):
