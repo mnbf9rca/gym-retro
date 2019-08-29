@@ -267,7 +267,7 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             if display_action:
                 print("action: ", action.squeeze())
             _, reward, done, _ = env.step(action)
-            total_reward += reward * 100
+            total_reward += reward * 10
 
             reward = torch.tensor([reward], device=device)
 
