@@ -9,4 +9,4 @@ worker:
   count: 1 #[required for multi-node]
 #filters:
   #branches:
-    #only: paperspace
+    #only: paperspace # filter branch
