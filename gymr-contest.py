@@ -256,13 +256,15 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
     for i_episode in range(num_episodes):
         # Initialize the environment and state
         env.reset()
-        last_screen = get_screen()
-        current_screen = get_screen()
-        state = current_screen - last_screen
+        # last_screen = get_screen()
+        # current_screen = get_screen()
+        # state = current_screen - last_screen
+        state = get_screen().to(device)
         total_reward = 0
         episode_start_time = datetime.now()
         for t in count():
             # Select and perform an action
+            # action = select_action(state, SELECT_ACTION_BIAS_LIST)
             action = select_action(state, SELECT_ACTION_BIAS_LIST)
             # "action", action)
             if display_action:
@@ -273,10 +275,10 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             reward = torch.tensor([reward], device=device)
 
             # Observe new state
-            last_screen = current_screen
-            current_screen = get_screen().to(device)
+            #last_screen = current_screen
+            #current_screen = get_screen().to(device)
             if not done:
-                next_state = current_screen - last_screen
+                next_state = get_screen().to(device)
                 next_state = next_state.detach()
             else:
                 next_state = None
