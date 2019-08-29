@@ -26,7 +26,8 @@ import os
 from support import save_frames_as_gif, install_games_from_rom_dir, download_and_unzip_rom_archive_from_url
 from sonic_util import make_env
 
-
+num_episodes = 100
+max_steps = 5000000  # per episode
 BATCH_SIZE = 64
 REPLAY_CAPACITY = 10000
 GAMMA = 0.999
@@ -37,9 +38,6 @@ TARGET_UPDATE = 10
 IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
-NUMBER_GAME_BUTTONS = 5
-num_episodes = 300
-max_steps = 5000000  # per episode
 store_model = True
 # or None - bias random selection towards this value
 SELECT_ACTION_BIAS_LIST = [0.175, 0.3, 0.175, 0.175, 0.175]
@@ -61,51 +59,11 @@ DS_PATH = 'roms/'  # edit with your path/to/rom
 install_games_from_rom_dir(DS_PATH)
 
 
-class DQN_old(nn.Module):
-
-    def __init__(self):
-        super(DQN, self).__init__()
-        # torch.nn.Conv2d(in_channels, out_channels, kernel_size, stride=1,
-        # padding=0, dilation=1, groups=1, bias=True, padding_mode='zeros')
-
-        self.layer1 = nn.Sequential(
-            nn.Conv2d(1, 160, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(160),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2))
-        self.layer2 = nn.Sequential(
-            nn.Conv2d(160, 80, kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm2d(80),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2))
-        self.drop_out = nn.Dropout()
-        self.fc1 = nn.Sequential(
-            nn.Linear(32000, 2000),
-            nn.Linear(2000, NUMBER_GAME_BUTTONS))
-
-        # self.head = nn.Linear(12, 12) # 12 possible actions in sonic 2
-
-    def forward(self, x):
-        out = x
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = out.reshape(out.size(0), -1)
-        out = self.drop_out(out)
-        out = self.fc1(out)
-        return out
-
-    def predict(self, x):
-        ''' This function for predicts classes by calculating the softmax '''
-        logits = self.forward(x)
-        # logits = F.softmax(logits)
-        return torch.argmax(logits, dim=1)
-
-
 class DQN(nn.Module):
 
-    def __init__(self, h, w):
+    def __init__(self, h, w, number_actions):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=5, stride=2)
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
         self.bn1 = nn.BatchNorm2d(16)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
         self.bn2 = nn.BatchNorm2d(32)
@@ -120,7 +78,7 @@ class DQN(nn.Module):
         convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
         convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
         linear_input_size = convw * convh * 32
-        self.head = nn.Linear(linear_input_size, NUMBER_GAME_BUTTONS)
+        self.head = nn.Linear(linear_input_size, number_actions)
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
@@ -159,10 +117,16 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-# In[17]:
+'''
+removing greyscale...
 resize = T.Compose([T.ToPILImage(),
                     T.Grayscale(),
                     T.Resize((IMAGE_RESIZED_TO, IMAGE_RESIZED_TO)),
+                    T.ToTensor()])
+'''
+
+resize = T.Compose([T.ToPILImage(),
+                    T.Resize(IMAGE_RESIZED_TO, interpolation=Image.CUBIC),
                     T.ToTensor()])
 
 # notes on output image dimensions/tensor layout
@@ -178,17 +142,23 @@ resize = T.Compose([T.ToPILImage(),
 
 def get_screen():
     '''
-    fetches a screen from the game, converts to greyscale and resizes to 320x320
+    fetches a screen from the game AND resizes to IMAGE_RESIZED_TO X IMAGE_RESIZED_TO
     '''
     # return an nparray with order w,h,c
     screen = env.render(mode='rgb_array')
     # plot_image(screen)
+
+    # Convert to float, rescale, convert to torch tensor
+    # (this doesn't require a copy)
+    screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
+    screen = torch.from_numpy(screen)
+
     # optionally, reorder to h,w,c (i.e. rotate)
     # screen = screen.transpose((1,0,2))
-    screen = resize(screen)
+
     # plot_image(screen.cpu().numpy().squeeze())
 
-    return screen.unsqueeze(0).to(device)
+    return resize(screen).unsqueeze(0).to(device)
 
 
 def select_action(state, bias_list=None):
@@ -212,12 +182,16 @@ def select_action(state, bias_list=None):
     else:
         # print("random action")
         # check if there's a bias towards any specific action
-        if bias_list:
-            selected_action = torch.tensor([np.random.choice(
-                NUMBER_GAME_BUTTONS, 1, p=bias_list)], device=device, dtype=torch.long)
-        else:
-            selected_action = torch.tensor(
-                [[random.randrange(NUMBER_GAME_BUTTONS)]], device=device, dtype=torch.long)
+        # if bias_list:
+        selected_action = torch.tensor([np.random.choice(
+                                        env.action_space.n,
+                                        1,
+                                        p=bias_list)],
+                                       device=device,
+                                       dtype=torch.long)
+        # else:
+        # selected_action = torch.tensor(
+        #    [[random.randrange(env.action_space.n)]], device=device, dtype=torch.long)
     # print(f"selected action {selected_action}")
     return selected_action
 
@@ -269,7 +243,7 @@ def optimize_model():
 frames = []
 
 
-def dqn_training(num_episodes, visualize_plt=False, max_steps=500, report_every=5000, display_action=False):
+def dqn_training(num_episodes, max_steps=500, display_action=False):
     """
     num_episodes: int 
         number of episodes
@@ -346,12 +320,28 @@ else:
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"setting device to '{device}'")
 
+# close current environment if there is one (e.g. on failure to complete last time)
+try:
+    env.close()
+except NameError:
+    pass
 
-policy_net = DQN(IMAGE_RESIZED_TO, IMAGE_RESIZED_TO).to(device)
-target_net = DQN(IMAGE_RESIZED_TO, IMAGE_RESIZED_TO).to(device)
-# print("Model's state_dict:")
-# for param_tensor in policy_net.state_dict():
-#     print(param_tensor, "\t", policy_net.state_dict()[param_tensor].size())
+# create the environment
+# Loading the level
+env = make_env(GAME_NAME, LEVEL, True)
+
+
+# Get screen size so that we can initialize layers correctly based on shape
+# returned from AI gym. Typical dimensions at this point are close to 3x40x90
+# which is the result of a clamped and down-scaled render buffer in get_screen()
+init_screen = get_screen()
+_, _, screen_height, screen_width = init_screen.shape
+
+# Get number of actions from gym action space
+n_actions = env.action_space.n
+
+policy_net = DQN(screen_height, screen_width, n_actions).to(device)
+target_net = DQN(screen_height, screen_width, n_actions).to(device)
 
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
@@ -362,20 +352,11 @@ memory = ReplayMemory(REPLAY_CAPACITY)
 
 steps_done = 0
 
-# close current environment if there is one (e.g. on failure to complete last time)
-try:
-    env.close()
-except NameError:
-    pass
 
-# create the environment
-# Loading the level
-env = make_env(GAME_NAME, LEVEL, True)
-report_every = max(max_steps/100, 100)
+
 
 dqn_training(num_episodes,
              max_steps=max_steps,
-             report_every=report_every,
              display_action=display_action)
 
 

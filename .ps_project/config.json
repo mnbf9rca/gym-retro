@@ -1,0 +1,8 @@
+{
+  "project": "gym-retro",
+  "machineType": "GV100",
+  "container": "paperspace/fastai",
+  "command": "cHl0aG9uIGd5bXItY29udGVzdC5weQ==",
+  "workspace": "/Users/rob/Downloads/git/gym-retro",
+  "lastJobId": "jrcgb3ukvb5n8"
+}
