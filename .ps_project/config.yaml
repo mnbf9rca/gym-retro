@@ -1,0 +1,12 @@
+version: 1
+
+project: "gym-retro"
+type: "single" #[single|multi-grpc|multi-mpi]
+worker:
+  container: "floydhub/pytorch:1.0.1-gpu.cuda9cudnn7-py3.42"
+  command: "python gymr-contest.py"
+  machine-type: "V100"
+  count: 1 #[required for multi-node]
+filters:
+  branches:
+    only: paperspace
