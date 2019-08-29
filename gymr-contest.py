@@ -60,14 +60,22 @@ install_games_from_rom_dir(DS_PATH)
 
 
 class DQN(nn.Module):
+    
     def __init__(self, d, h, w, number_actions):
         super(DQN, self).__init__()
+        self.input_width = w
+        self.input_height = h
         self.conv1 = nn.Conv2d(d, 16, kernel_size=5, stride=2)
         self.bn1 = nn.BatchNorm2d(16)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
         self.bn2 = nn.BatchNorm2d(32)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
         self.bn3 = nn.BatchNorm2d(32)
+        if w >= 128 and h >= 128:
+            self.conv4 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
+            self.bn4 = nn.BatchNorm2d(32)
+            self.conv5 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
+            self.bn5 = nn.BatchNorm2d(32)
 
         # Number of Linear input connections depends on output of conv2d layers
         # and therefore the input image size, so compute it.
@@ -79,7 +87,6 @@ class DQN(nn.Module):
         linear_input_size = convw * convh * 32
         self.head = nn.Linear(linear_input_size, number_actions)
 
-
     def forward(self, x):
         '''
         Called with either one element to determine next action, or a batch during optimization.
@@ -88,6 +95,9 @@ class DQN(nn.Module):
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
+        if self.input_width >= 128 and self.input_height >= 128:
+            x = F.relu(self.bn4(self.conv4(x)))
+            x = F.relu(self.bn5(self.conv5(x)))
         return self.head(x.view(x.size(0), -1))
 
 
@@ -256,10 +266,10 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
     for i_episode in range(num_episodes):
         # Initialize the environment and state
         env.reset()
-        # last_screen = get_screen()
-        # current_screen = get_screen()
-        # state = current_screen - last_screen
-        state = get_screen().to(device)
+        last_screen = get_screen()
+        current_screen = get_screen()
+        state = current_screen - last_screen
+        # state = get_screen().to(device)
         total_reward = 0
         episode_start_time = datetime.now()
         for t in count():
@@ -275,10 +285,10 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             reward = torch.tensor([reward], device=device)
 
             # Observe new state
-            #last_screen = current_screen
-            #current_screen = get_screen().to(device)
+            last_screen = current_screen
+            current_screen = get_screen().to(device)
             if not done:
-                next_state = get_screen().to(device)
+                next_state = current_screen
                 next_state = next_state.detach()
             else:
                 next_state = None
