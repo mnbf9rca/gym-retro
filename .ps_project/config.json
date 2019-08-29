@@ -4,5 +4,5 @@
   "container": "floydhub/pytorch:1.0.1-gpu.cuda9cudnn7-py3.42",
   "command": "cHl0aG9uIGd5bXItY29udGVzdC5weQ==",
   "workspace": "/Users/rob/Downloads/git/gym-retro",
-  "lastJobId": "jonn11bxk1q4v"
+  "lastJobId": "js4uj5br1gl5t4"
 }

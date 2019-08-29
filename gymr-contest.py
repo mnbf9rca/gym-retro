@@ -61,17 +61,18 @@ install_games_from_rom_dir(DS_PATH)
 
 class DQN(nn.Module):
     
-    def __init__(self, d, h, w, number_actions):
+    def __init__(self, depth, height, width, number_actions):
         super(DQN, self).__init__()
-        self.input_width = w
-        self.input_height = h
-        self.conv1 = nn.Conv2d(d, 16, kernel_size=5, stride=2)
+        self.input_width = width
+        self.input_height = height
+        self.input_depth = depth
+        self.conv1 = nn.Conv2d(self.input_depth, 16, kernel_size=5, stride=2)
         self.bn1 = nn.BatchNorm2d(16)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
         self.bn2 = nn.BatchNorm2d(32)
         self.conv3 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
         self.bn3 = nn.BatchNorm2d(32)
-        if w >= 128 and h >= 128:
+        if self.input_width >= 128 and self.input_height >= 128:
             self.conv4 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
             self.bn4 = nn.BatchNorm2d(32)
             self.conv5 = nn.Conv2d(32, 32, kernel_size=5, stride=2)
@@ -82,8 +83,12 @@ class DQN(nn.Module):
         def conv2d_size_out(size, kernel_size=5, stride=2):
             return (size - (kernel_size - 1) - 1) // stride + 1
 
-        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(w)))
-        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(h)))
+        convw = conv2d_size_out(conv2d_size_out(conv2d_size_out(self.input_width)))
+        convh = conv2d_size_out(conv2d_size_out(conv2d_size_out(self.input_height)))
+        if self.input_width >= 128 and self.input_height >= 128:
+            convw = conv2d_size_out(conv2d_size_out(convw))
+            convh = conv2d_size_out(conv2d_size_out(convh))
+
         linear_input_size = convw * convh * 32
         self.head = nn.Linear(linear_input_size, number_actions)
 
@@ -355,6 +360,7 @@ env = make_env(GAME_NAME, LEVEL, True)
 # which is the result of a clamped and down-scaled render buffer in get_screen()
 init_screen = get_screen()
 _, screen_depth, screen_height, screen_width = init_screen.shape
+print(f"discovered input image ({screen_depth},{screen_height},{screen_width})")
 
 # Get number of actions from gym action space
 n_actions = env.action_space.n
