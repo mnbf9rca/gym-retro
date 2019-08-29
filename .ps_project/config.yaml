@@ -7,6 +7,6 @@ worker:
   command: "python gymr-contest.py"
   machine-type: "V100"
   count: 1 #[required for multi-node]
-#filters:
-  #branches:
-    #only: paperspace # filter branch
+filters:
+  branches:
+    only: paperspace # filter branch
