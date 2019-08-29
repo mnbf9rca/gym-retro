@@ -1,6 +1,6 @@
 version: 1
 
-project: "gym-retro-ci"
+project: "pr62dpymb"
 type: "single" #[single|multi-grpc|multi-mpi]
 worker:
   container: "floydhub/pytorch:1.0.1-gpu.cuda9cudnn7-py3.42"
