@@ -35,7 +35,7 @@ EPS_START = 0.9
 EPS_END = 0.05
 EPS_DECAY = 50000  # how many steps does it take before EPS is zero? - across episodes...
 TARGET_UPDATE = 10
-IMAGE_RESIZED_TO = 80  # squaere
+IMAGE_RESIZED_TO = 160  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
@@ -60,9 +60,9 @@ install_games_from_rom_dir(DS_PATH)
 
 
 class DQN(nn.Module):
-    def __init__(self, h, w, number_actions):
+    def __init__(self, d, h, w, number_actions):
         super(DQN, self).__init__()
-        self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
+        self.conv1 = nn.Conv2d(d, 16, kernel_size=5, stride=2)
         self.bn1 = nn.BatchNorm2d(16)
         self.conv2 = nn.Conv2d(16, 32, kernel_size=5, stride=2)
         self.bn2 = nn.BatchNorm2d(32)
@@ -128,6 +128,7 @@ resize = T.Compose([T.ToPILImage(),
 '''
 
 resize = T.Compose([T.ToPILImage(),
+                    T.Grayscale(),
                     T.Resize((IMAGE_RESIZED_TO, IMAGE_RESIZED_TO), interpolation=Image.CUBIC),
                     T.ToTensor()])
 
@@ -341,13 +342,13 @@ env = make_env(GAME_NAME, LEVEL, True)
 # returned from AI gym. Typical dimensions at this point are close to 3x40x90
 # which is the result of a clamped and down-scaled render buffer in get_screen()
 init_screen = get_screen()
-_, _, screen_height, screen_width = init_screen.shape
+_, screen_depth, screen_height, screen_width = init_screen.shape
 
 # Get number of actions from gym action space
 n_actions = env.action_space.n
 
-policy_net = DQN(screen_height, screen_width, n_actions).to(device)
-target_net = DQN(screen_height, screen_width, n_actions).to(device)
+policy_net = DQN(screen_depth, screen_height, screen_width, n_actions).to(device)
+target_net = DQN(screen_depth, screen_height, screen_width, n_actions).to(device)
 
 
 target_net.load_state_dict(policy_net.state_dict())
