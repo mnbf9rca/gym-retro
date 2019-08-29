@@ -25,6 +25,7 @@ import retro
 import os
 from support import save_frames_as_gif, install_games_from_rom_dir, download_and_unzip_rom_archive_from_url
 from sonic_util import make_env
+from torch.autograd import Variable # FQDN
 
 num_episodes = 100
 max_steps = 5000000  # per episode
@@ -35,7 +36,7 @@ EPS_START = 0.9
 EPS_END = 0.05
 EPS_DECAY = 50000  # how many steps does it take before EPS is zero? - across episodes...
 TARGET_UPDATE = 10
-IMAGE_RESIZED_TO = 160  # squaere
+IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
@@ -58,9 +59,51 @@ DS_PATH = 'roms/'  # edit with your path/to/rom
 
 install_games_from_rom_dir(DS_PATH)
 
+class FDQN(nn.Module):
+    '''
+    3 CNN + 2 FC layers
+    from https://github.com/Shmuma/rl/blob/ptan/ptan/samples/dqn_expreplay_doom.py
+    input_shape=(1, 80, 80) (from source)
+    '''
+    def __init__(self, depth, height, width, n_actions):
+        super(FDQN, self).__init__()
+        self.conv1 = nn.Conv2d(depth, 32, 5)
+        self.conv2 = nn.Conv2d(32, 32, 3)
+        self.conv3 = nn.Conv2d(32, 64, 2)
+
+        n_size = self._get_conv_output((depth, height, width))
+
+        self.fc1 = nn.Linear(n_size, 256)
+        self.fc2 = nn.Linear(256, 256)
+        self.fc3 = nn.Linear(256, n_actions)
+
+    def _get_conv_output(self, shape):
+        input = Variable(torch.rand(1, *shape))
+        output_feat = self._forward_conv(input)
+        print("Conv out shape: %s" % str(output_feat.size()))
+        n_size = output_feat.data.view(1, -1).size(1)
+        print("Conv out size: %s" % str(n_size))
+        return n_size
+
+    def _forward_conv(self, x):
+        x = F.relu(F.max_pool2d(self.conv1(x), 3, 2))
+        x = F.relu(F.max_pool2d(self.conv2(x), 3, 2))
+        x = F.relu(F.max_pool2d(self.conv3(x), 3, 2))
+        return x
+
+    def forward(self, x):
+        x = self._forward_conv(x)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x).view(x.size(0), -1)
+        # print("forward x", x)
+        return x
 
 class DQN(nn.Module):
-    
+    '''
+    3 or 5 layer CNN, no FC layers
+    '''
     def __init__(self, depth, height, width, number_actions):
         super(DQN, self).__init__()
         self.input_width = width
@@ -103,7 +146,9 @@ class DQN(nn.Module):
         if self.input_width >= 128 and self.input_height >= 128:
             x = F.relu(self.bn4(self.conv4(x)))
             x = F.relu(self.bn5(self.conv5(x)))
-        return self.head(x.view(x.size(0), -1))
+        x = self.head(x.view(x.size(0), -1))
+        # print("forward x", x)
+        return x
 
 
 # use replay to handle image transitions
@@ -239,7 +284,7 @@ def optimize_model():
 
     # Compute V(s_{t+1}) for all next states.
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
-    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
+    next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0]
     # Compute the expected Q values
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -294,12 +339,12 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             current_screen = get_screen().to(device)
             if not done:
                 next_state = current_screen
-                next_state = next_state.detach()
+                next_state = next_state
             else:
                 next_state = None
 
             # Store the transition in memory
-            memory.push(state.detach(), action.detach(), next_state, reward.detach())
+            memory.push(state, action, next_state, reward)
 
             # Move to the next state
             state = next_state
@@ -314,11 +359,13 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(f'{{"metric": "total steps", "value": {steps_done}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "steps this episode", "value": {t}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "episode duration", "value": {episode_time}, "epoch": {i_episode+1}}}')
+                print(f'{{"metric": "steps per second", "value": {float(t) / float(episode_time)}, "epoch": {i_episode+1}}}')
                 # paperspace
                 # {"chart": "<identifier>", "y": <value>, "x": <value>}
                 print(f'{{"chart": "score", "y": {total_reward}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "steps_this_episode", "y": {t}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "episode_duration", "y": {episode_time}, "x": {i_episode+1}}}')
+                print(f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
                 break
 
         # Update the target network
@@ -365,8 +412,8 @@ print(f"discovered input image ({screen_depth},{screen_height},{screen_width})")
 # Get number of actions from gym action space
 n_actions = env.action_space.n
 
-policy_net = DQN(screen_depth, screen_height, screen_width, n_actions).to(device)
-target_net = DQN(screen_depth, screen_height, screen_width, n_actions).to(device)
+policy_net = FDQN(screen_depth, screen_height, screen_width, n_actions).to(device)
+target_net = FDQN(screen_depth, screen_height, screen_width, n_actions).to(device)
 
 
 target_net.load_state_dict(policy_net.state_dict())
@@ -382,6 +429,7 @@ steps_done = 0
 print('{"chart": "score", "axis": "epoch"}')
 print('{"chart": "steps_this_episode", "axis": "epoch"}')
 print('{"chart": "episode_duration", "axis": "epoch"}')
+print('{"chart": "steps_per_second", "axis": "epoch"}')
 
 
 dqn_training(num_episodes,
