@@ -1,8 +1,8 @@
 {
   "project": "gym-retro",
-  "machineType": "GV100",
-  "container": "paperspace/fastai",
+  "machineType": "V100",
+  "container": "floydhub/pytorch:1.0.1-gpu.cuda9cudnn7-py3.42",
   "command": "cHl0aG9uIGd5bXItY29udGVzdC5weQ==",
   "workspace": "/Users/rob/Downloads/git/gym-retro",
-  "lastJobId": "jrcgb3ukvb5n8"
+  "lastJobId": "jl8zib20gf4cl"
 }

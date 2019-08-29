@@ -29,7 +29,7 @@ from sonic_util import make_env
 num_episodes = 100
 max_steps = 5000000  # per episode
 BATCH_SIZE = 64
-REPLAY_CAPACITY = 10000
+REPLAY_CAPACITY = 5000
 GAMMA = 0.999
 EPS_START = 0.9
 EPS_END = 0.05
@@ -60,7 +60,6 @@ install_games_from_rom_dir(DS_PATH)
 
 
 class DQN(nn.Module):
-
     def __init__(self, h, w, number_actions):
         super(DQN, self).__init__()
         self.conv1 = nn.Conv2d(3, 16, kernel_size=5, stride=2)
@@ -80,10 +79,12 @@ class DQN(nn.Module):
         linear_input_size = convw * convh * 32
         self.head = nn.Linear(linear_input_size, number_actions)
 
-    # Called with either one element to determine next action, or a batch
-    # during optimization. Returns tensor([[left0exp,right0exp]...]).
-    def forward(self, x):
 
+    def forward(self, x):
+        '''
+        Called with either one element to determine next action, or a batch during optimization.
+        Returns tensor([[left0exp,right0exp]...]).
+        '''
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
@@ -111,6 +112,7 @@ class ReplayMemory(object):
         self.position = (self.position + 1) % self.capacity
 
     def sample(self, batch_size):
+        '''returns a random sample of batch_size transitions'''
         return random.sample(self.memory, batch_size)
 
     def __len__(self):
@@ -126,7 +128,7 @@ resize = T.Compose([T.ToPILImage(),
 '''
 
 resize = T.Compose([T.ToPILImage(),
-                    T.Resize(IMAGE_RESIZED_TO, interpolation=Image.CUBIC),
+                    T.Resize((IMAGE_RESIZED_TO, IMAGE_RESIZED_TO), interpolation=Image.CUBIC),
                     T.ToTensor()])
 
 # notes on output image dimensions/tensor layout
@@ -178,7 +180,6 @@ def select_action(state, bias_list=None):
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
             selected_action = policy_net(state).max(1)[1].view(1, 1)
-            # selected_action = policy_net.predict(state.to(device)).view(1,1)
     else:
         # print("random action")
         # check if there's a bias towards any specific action
@@ -290,11 +291,16 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             if done or t > max_steps:
                 episode_end_time = datetime.now()
                 episode_time = (episode_end_time - episode_start_time).total_seconds()
+                # floyd metrics
                 print(f'{{"metric": "score", "value": {total_reward}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "total steps", "value": {steps_done}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "steps this episode", "value": {t}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "episode duration", "value": {episode_time}, "epoch": {i_episode+1}}}')
-                observation = env.reset()
+                # paperspace
+                # {"chart": "<identifier>", "y": <value>, "x": <value>}
+                print(f'{{"chart": "score", "y": {total_reward}, "x": {i_episode+1}}}')
+                print(f'{{"chart": "steps_this_episode", "y": {t}, "x": {i_episode+1}}}')
+                print(f'{{"chart": "episode_duration", "y": {episode_time}, "x": {i_episode+1}}}')
                 break
 
         # Update the target network
@@ -343,6 +349,7 @@ n_actions = env.action_space.n
 policy_net = DQN(screen_height, screen_width, n_actions).to(device)
 target_net = DQN(screen_height, screen_width, n_actions).to(device)
 
+
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
@@ -352,7 +359,10 @@ memory = ReplayMemory(REPLAY_CAPACITY)
 
 steps_done = 0
 
-
+# charts for paperspace
+print('{"chart": "score", "axis": "epoch"}')
+print('{"chart": "steps_this_episode", "axis": "epoch"}')
+print('{"chart": "episode_duration", "axis": "epoch"}')
 
 
 dqn_training(num_episodes,
