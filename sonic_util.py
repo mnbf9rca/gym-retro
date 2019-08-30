@@ -88,7 +88,7 @@ class RewardScaler(gym.RewardWrapper):
             rewards 1 for each step which happens to reward duration of game
         '''
 
-        return (log1p(reward) * 0.1, reward)
+        return (float(log1p(reward) * 0.1), reward)
     
 
 
