@@ -167,7 +167,7 @@ class DQN(nn.Module):
         return x
 
 
-class scoreAverage(object):
+class scoreAverage():
     def __init__(self, capacity):
         self.capacity = capacity
         self.memory = []
@@ -181,8 +181,8 @@ class scoreAverage(object):
         self.position = (self.position + 1) % self.capacity
 
     def mean(self):
-        if len(self.memory) == 0:
-            return None
+        if len(self.memory) == 0: # pylint: disable=C1801
+            return None 
         return float(sum(self.memory))/float(len(self.memory))
 
 # use replay to handle image transitions
@@ -192,7 +192,7 @@ Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
 
-class ReplayMemory(object):
+class ReplayMemory():
 
     def __init__(self, capacity):
         self.capacity = capacity

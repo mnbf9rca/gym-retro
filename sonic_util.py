@@ -3,15 +3,15 @@ Environments and wrappers for Sonic training.
 https://github.com/openai/retro-baselines/tree/master/agents
 adapted by mnbf9rca
 """
-
+from math import log1p
 import gym
 import numpy as np
 import retro
-from math import log1p
+
 # from baselines.common.atari_wrappers import WarpFrame, FrameStack
 
 
-def make_env(game_name, game_level, save_game = False, scale_rew=True):
+def make_env(game_name, game_level, save_game=False, scale_rew=True):
     """
     Create an environment with some standard wrappers.
     """
@@ -74,7 +74,6 @@ class SonicDiscretizer(gym.ActionWrapper):
         return self._actions[a].copy()
 
 
-
 class RewardScaler(gym.RewardWrapper):
     """
     Bring rewards to a reasonable scale for PPO.
@@ -88,9 +87,7 @@ class RewardScaler(gym.RewardWrapper):
             rewards 1 for each step which happens to reward duration of game
         '''
 
-        return (float(log1p(max(reward,1)) * 0.1), reward)
-    
-
+        return (float(log1p(max(reward, 1)) * 0.1), reward)
 
 
 class AllowBacktracking(gym.Wrapper):
