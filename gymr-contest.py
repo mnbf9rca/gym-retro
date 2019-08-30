@@ -25,23 +25,24 @@ import retro
 import os
 from support import save_frames_as_gif, install_games_from_rom_dir, download_and_unzip_rom_archive_from_url
 from sonic_util import make_env
-from torch.autograd import Variable # FQDN
+from torch.autograd import Variable  # FQDN
+from srsly import json_dumps
 
-num_episodes = 100
+num_episodes = 500
 max_steps = 5000000  # per episode
 BATCH_SIZE = 64
 REPLAY_CAPACITY = 5000
-GAMMA = 0.999
+GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 50000  # how many steps does it take before EPS is zero? - across episodes...
+EPS_DECAY = 5000  # how many steps does it take before EPS is zero? - across episodes...
 TARGET_UPDATE = 10
 IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
 # or None - bias random selection towards this value
-SELECT_ACTION_BIAS_LIST = [0.175, 0.3, 0.175, 0.175, 0.175]
+SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
 display_action = False
 
 
@@ -59,12 +60,14 @@ DS_PATH = 'roms/'  # edit with your path/to/rom
 
 install_games_from_rom_dir(DS_PATH)
 
+
 class FDQN(nn.Module):
     '''
     3 CNN + 2 FC layers
     from https://github.com/Shmuma/rl/blob/ptan/ptan/samples/dqn_expreplay_doom.py
-    input_shape=(1, 80, 80) (from source)
+    ideal input_shape=(1, 80, 80) (from source)
     '''
+
     def __init__(self, depth, height, width, n_actions):
         super(FDQN, self).__init__()
         self.conv1 = nn.Conv2d(depth, 32, 5)
@@ -100,10 +103,12 @@ class FDQN(nn.Module):
         # print("forward x", x)
         return x
 
+
 class DQN(nn.Module):
     '''
     3 or 5 layer CNN, no FC layers
     '''
+
     def __init__(self, depth, height, width, number_actions):
         super(DQN, self).__init__()
         self.input_width = width
@@ -150,6 +155,25 @@ class DQN(nn.Module):
         # print("forward x", x)
         return x
 
+# store a log of all actions, states, rewards, info
+
+
+Staterecord = namedtuple('Staterecord',
+                       ('action', 'reward', 'info', 'done'))
+
+class GameState(object):
+    def __init__(self):
+        self.history = []
+        self.index = 0
+    def push(self, *args):
+        '''saves a game state
+        ('action', 'reward', 'info', 'done')
+        '''
+        self.history.append(None)
+        self.history[self.index ] = Staterecord(*args)
+        self.index += 1
+    def __len__(self):
+        return len(self.history)
 
 # use replay to handle image transitions
 
@@ -322,15 +346,27 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
         # state = get_screen().to(device)
         total_reward = 0
         episode_start_time = datetime.now()
+        statememory = []
         for t in count():
+            # initialise state memory
+
+
+
             # Select and perform an action
             # action = select_action(state, SELECT_ACTION_BIAS_LIST)
             action = select_action(state, SELECT_ACTION_BIAS_LIST)
             # "action", action)
             if display_action:
                 print("action: ", action.squeeze())
-            _, reward, done, _ = env.step(action)
-            total_reward += reward * 10
+            _, reward, done, info = env.step(action)
+
+            normalised_reward = math.expm1(reward)
+            
+            # ('action', 'reward', 'info', 'done')
+            this_state = f'{{"action":{action.data[0].item()}, "normalised_reward":{normalised_reward}, "info":{info}, "done":{done}}}'
+
+            statememory.append(this_state)
+            total_reward += normalised_reward
 
             reward = torch.tensor([reward], device=device)
 
@@ -359,13 +395,21 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(f'{{"metric": "total steps", "value": {steps_done}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "steps this episode", "value": {t}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "episode duration", "value": {episode_time}, "epoch": {i_episode+1}}}')
-                print(f'{{"metric": "steps per second", "value": {float(t) / float(episode_time)}, "epoch": {i_episode+1}}}')
+                print(
+                    f'{{"metric": "steps per second", "value": {float(t) / float(episode_time)}, "epoch": {i_episode+1}}}')
                 # paperspace
                 # {"chart": "<identifier>", "y": <value>, "x": <value>}
                 print(f'{{"chart": "score", "y": {total_reward}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "steps_this_episode", "y": {t}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "episode_duration", "y": {episode_time}, "x": {i_episode+1}}}')
-                print(f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
+                print(
+                    f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
+                game_history = json_dumps(statememory)
+                filename = f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json'
+                f = open(filename,"w")
+                f.write(game_history)
+                f.close()
+                
                 break
 
         # Update the target network
@@ -399,7 +443,7 @@ except NameError:
 
 # create the environment
 # Loading the level
-env = make_env(GAME_NAME, LEVEL, True)
+env = make_env(GAME_NAME, LEVEL, save_game = store_model)
 
 
 # Get screen size so that we can initialize layers correctly based on shape

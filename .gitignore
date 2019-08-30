@@ -5,6 +5,10 @@ gym-retro.zip
 roms/*
 ROMS/*
 
+# game histories
+*.bk2
+gamedata-*.json
+
 # models
 models/*
 
