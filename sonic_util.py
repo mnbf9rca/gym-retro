@@ -84,7 +84,10 @@ class RewardScaler(gym.RewardWrapper):
     """
 
     def reward(self, reward):
-        return log1p(reward)
+        '''returns (log1p(reward), reward)'''
+        if reward == 0:
+            reward = 1
+        return (log1p(reward), reward)
     
 
 

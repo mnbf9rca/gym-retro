@@ -155,25 +155,7 @@ class DQN(nn.Module):
         # print("forward x", x)
         return x
 
-# store a log of all actions, states, rewards, info
 
-
-Staterecord = namedtuple('Staterecord',
-                       ('action', 'reward', 'info', 'done'))
-
-class GameState(object):
-    def __init__(self):
-        self.history = []
-        self.index = 0
-    def push(self, *args):
-        '''saves a game state
-        ('action', 'reward', 'info', 'done')
-        '''
-        self.history.append(None)
-        self.history[self.index ] = Staterecord(*args)
-        self.index += 1
-    def __len__(self):
-        return len(self.history)
 
 # use replay to handle image transitions
 
@@ -359,16 +341,14 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             if display_action:
                 print("action: ", action.squeeze())
             _, reward, done, info = env.step(action)
-
-            normalised_reward = math.expm1(reward)
             
             # ('action', 'reward', 'info', 'done')
-            this_state = f'{{"action":{action.data[0].item()}, "normalised_reward":{normalised_reward}, "info":{info}, "done":{done}}}'
+            this_state = {"action":action.data[0].item(), "reward":reward[1], "scaled_reward":reward[0],"info":info, "done":done}
 
             statememory.append(this_state)
-            total_reward += normalised_reward
+            total_reward += reward[1]
 
-            reward = torch.tensor([reward], device=device)
+            reward = torch.tensor([reward[0]], device=device)
 
             # Observe new state
             last_screen = current_screen
