@@ -41,6 +41,7 @@ IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
+report_mean_score_over_n = 20
 # or None - bias random selection towards this value
 SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
 display_action = False
@@ -156,8 +157,26 @@ class DQN(nn.Module):
         return x
 
 
+class scoreAverage(object):
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.memory = []
+        self.position = 0
+
+    def push(self, score):
+        """Saves a score."""
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.position] = score
+        self.position = (self.position + 1) % self.capacity
+
+    def mean(self):
+        if len(self.memory) == 0:
+            return None
+        return float(sum(self.memory))/float(len(self.memory))
 
 # use replay to handle image transitions
+
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -319,6 +338,7 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
         if true, display the cartpole action in the notebook
         if false (default), display the episodes x durations graph
     """
+    score_history = scoreAverage(report_mean_score_over_n)
     for i_episode in range(num_episodes):
         # Initialize the environment and state
         env.reset()
@@ -332,8 +352,6 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
         for t in count():
             # initialise state memory
 
-
-
             # Select and perform an action
             # action = select_action(state, SELECT_ACTION_BIAS_LIST)
             action = select_action(state, SELECT_ACTION_BIAS_LIST)
@@ -341,9 +359,10 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             if display_action:
                 print("action: ", action.squeeze())
             _, reward, done, info = env.step(action)
-            
+
             # ('action', 'reward', 'info', 'done')
-            this_state = {"action":action.data[0].item(), "reward":reward[1], "scaled_reward":reward[0],"info":info, "done":done}
+            this_state = {"action": action.data[0].item(
+            ), "reward": reward[1], "scaled_reward": reward[0], "info": info, "done": done}
 
             statememory.append(this_state)
             total_reward += reward[1]
@@ -370,26 +389,30 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             if done or t > max_steps:
                 episode_end_time = datetime.now()
                 episode_time = (episode_end_time - episode_start_time).total_seconds()
+                score_history.push(total_reward)
                 # floyd metrics
                 print(f'{{"metric": "score", "value": {total_reward}, "epoch": {i_episode+1}}}')
-                print(f'{{"metric": "total steps", "value": {steps_done}, "epoch": {i_episode+1}}}')
+                print(
+                    f'{{"metric": "rolling mean score", "value": {score_history.mean()}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "steps this episode", "value": {t}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "episode duration", "value": {episode_time}, "epoch": {i_episode+1}}}')
                 print(
                     f'{{"metric": "steps per second", "value": {float(t) / float(episode_time)}, "epoch": {i_episode+1}}}')
+
                 # paperspace
                 # {"chart": "<identifier>", "y": <value>, "x": <value>}
                 print(f'{{"chart": "score", "y": {total_reward}, "x": {i_episode+1}}}')
+                print(f'{{"chart": "rolling_mean_score", "y": {score_history.mean()}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "steps_this_episode", "y": {t}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "episode_duration", "y": {episode_time}, "x": {i_episode+1}}}')
                 print(
                     f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
                 game_history = json_dumps(statememory)
                 filename = f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json'
-                f = open(filename,"w")
+                f = open(filename, "w")
                 f.write(game_history)
                 f.close()
-                
+
                 break
 
         # Update the target network
@@ -423,7 +446,7 @@ except NameError:
 
 # create the environment
 # Loading the level
-env = make_env(GAME_NAME, LEVEL, save_game = store_model)
+env = make_env(GAME_NAME, LEVEL, save_game=store_model)
 
 
 # Get screen size so that we can initialize layers correctly based on shape
@@ -451,6 +474,7 @@ steps_done = 0
 
 # charts for paperspace
 print('{"chart": "score", "axis": "epoch"}')
+print('{"chart": "rolling_mean_score", "axis": "epoch"}')
 print('{"chart": "steps_this_episode", "axis": "epoch"}')
 print('{"chart": "episode_duration", "axis": "epoch"}')
 print('{"chart": "steps_per_second", "axis": "epoch"}')
