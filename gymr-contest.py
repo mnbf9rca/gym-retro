@@ -181,8 +181,8 @@ class scoreAverage():
         self.position = (self.position + 1) % self.capacity
 
     def mean(self):
-        if len(self.memory) == 0: # pylint: disable=C1801
-            return None 
+        if len(self.memory) == 0:  # pylint: disable=C1801
+            return None
         return float(sum(self.memory))/float(len(self.memory))
 
 # use replay to handle image transitions
@@ -417,12 +417,12 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(f'{{"chart": "episode_duration", "y": {episode_time}, "x": {i_episode+1}}}')
                 print(
                     f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
-                game_history = json_dumps(statememory)
                 filename = os.path.join(
                     STATE_DIR, f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
-                f = open(filename, "w")
-                f.write(game_history)
-                f.close()
+                os.makedirs(os.path.dirname(filename), exist_ok=True)
+                with open(filename, "w") as f:
+                    f.write(json_dumps(statememory))
+                    f.close()
 
                 break
 
@@ -501,8 +501,8 @@ dqn_training(num_episodes,
 if store_model:
     print('saving')
     date_time = datetime.now().strftime("%Y%d%Y-%H%M%S")
-    torch.save(target_net.state_dict(), os.path.join(
-        MODEL_DIR, f'target_net-{GAME_NAME}-{date_time}.pt'))
-    torch.save(policy_net.state_dict(), os.path.join(
-        MODEL_DIR, f'policy_net-{GAME_NAME}-{date_time}.pt'))
+    torch.save(target_net.state_dict(),
+               os.path.join(MODEL_DIR, f'target_net-{GAME_NAME}-{date_time}.pt'))
+    torch.save(policy_net.state_dict(),
+               os.path.join(MODEL_DIR, f'policy_net-{GAME_NAME}-{date_time}.pt'))
     print('saved')
