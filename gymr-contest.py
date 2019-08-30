@@ -30,7 +30,7 @@ from srsly import json_dumps
 
 num_episodes = 1500
 max_steps = 5000000  # per episode
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 REPLAY_CAPACITY = 5000
 GAMMA = 0.99
 EPS_START = 0.9
@@ -45,7 +45,7 @@ ROM_PATH = './roms'  # where to find ROMs
 RECORD_DIR = './bk2'  # where to save output BK2 files
 MODEL_DIR = "./models"  # where to store final model
 STATE_DIR = "./gamestates"  # where to store game state files
-report_mean_score_over_n = 20
+report_mean_score_over_n = 50
 # or None - bias random selection towards this value
 SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
 display_action = False
