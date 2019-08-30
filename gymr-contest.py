@@ -41,29 +41,28 @@ IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
+ROM_PATH = 'roms/'  # where to find ROMs
+RECORD_DIR = '.'  # where to save output BK2 files
+MODEL_DIR = "./models"  # where to store final model
+STATE_DIR = "."  # where to store game state files
 report_mean_score_over_n = 20
 # or None - bias random selection towards this value
 SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
 display_action = False
 
-
 # Before running the installation steps, we have to check the python version because `gym-retro` doesn't support Python 2.
-
 if sys.version_info[0] < 3:
     raise Exception("Gym Retro requires Python > 2")
 else:
     print('Your python version is OK.')
     print(sys.version_info)
 
-ROM_PATH = 'roms/'
-RECORD_DIR = '.'
-MODEL_DIR = "./models"
-STATE_DIR = "."
+
 # check if running in paperspace
 if os.path.isdir("/storage") & os.path.isdir("/artifacts"):
     # /storage and /artifacts both exist
     # these are special directories on paperspace
-    ROM_PATH = '/storage/roms' 
+    ROM_PATH = '/storage/roms'
     RECORD_DIR = "/artifacts/bk2"
     MODEL_DIR = "/artifacts/models"
     STATE_DIR = "/artifacts/gamestates"
@@ -419,7 +418,8 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(
                     f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
                 game_history = json_dumps(statememory)
-                filename = os.path.join(STATE_DIR, f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
+                filename = os.path.join(
+                    STATE_DIR, f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
                 f = open(filename, "w")
                 f.write(game_history)
                 f.close()
@@ -501,6 +501,8 @@ dqn_training(num_episodes,
 if store_model:
     print('saving')
     date_time = datetime.now().strftime("%Y%d%Y-%H%M%S")
-    torch.save(target_net.state_dict(), os.path.join(MODEL_DIR, f'target_net-{GAME_NAME}-{date_time}.pt'))
-    torch.save(policy_net.state_dict(), os.path.join(MODEL_DIR, f'policy_net-{GAME_NAME}-{date_time}.pt'))
+    torch.save(target_net.state_dict(), os.path.join(
+        MODEL_DIR, f'target_net-{GAME_NAME}-{date_time}.pt'))
+    torch.save(policy_net.state_dict(), os.path.join(
+        MODEL_DIR, f'policy_net-{GAME_NAME}-{date_time}.pt'))
     print('saved')
