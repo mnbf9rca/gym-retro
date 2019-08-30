@@ -6,4 +6,5 @@
   "workspace": "/Users/rob/Downloads/git/gym-retro",
   "lastJobId": "jhga697bokng4",
   "name": "3CNN + 3FC, 80x80, log1p(0.1x) r (ig 200),diff, not det,g 0.99, EPS 5000, 500 it, adjusted bias"
+
 }
