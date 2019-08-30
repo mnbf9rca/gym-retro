@@ -28,7 +28,7 @@ from sonic_util import make_env
 from torch.autograd import Variable  # FQDN
 from srsly import json_dumps
 
-num_episodes = 500
+num_episodes = 1500
 max_steps = 5000000  # per episode
 BATCH_SIZE = 64
 REPLAY_CAPACITY = 5000
@@ -55,11 +55,22 @@ else:
     print('Your python version is OK.')
     print(sys.version_info)
 
+ROM_PATH = 'roms/'
+RECORD_DIR = '.'
+MODEL_DIR = "./models"
+STATE_DIR = "."
+# check if running in paperspace
+if os.path.isdir("/storage") & os.path.isdir("/artifacts"):
+    # /storage and /artifacts both exist
+    # these are special directories on paperspace
+    ROM_PATH = '/storage/roms' 
+    RECORD_DIR = "/artifacts/bk2"
+    MODEL_DIR = "/artifacts/models"
+    STATE_DIR = "/artifacts/gamestates"
+
 
 # Load ROMs
-DS_PATH = 'roms/'  # edit with your path/to/rom
-
-install_games_from_rom_dir(DS_PATH)
+install_games_from_rom_dir(ROM_PATH)
 
 
 class FDQN(nn.Module):
@@ -408,7 +419,7 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(
                     f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
                 game_history = json_dumps(statememory)
-                filename = f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json'
+                filename = os.path.join(STATE_DIR, f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
                 f = open(filename, "w")
                 f.write(game_history)
                 f.close()
@@ -434,6 +445,7 @@ else:
     num_episodes = 3
     max_steps = 500
     store_model = False
+    RECORD_DIR = False
     BATCH_SIZE = 8
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"setting device to '{device}'")
@@ -446,7 +458,7 @@ except NameError:
 
 # create the environment
 # Loading the level
-env = make_env(GAME_NAME, LEVEL, save_game=store_model)
+env = make_env(GAME_NAME, LEVEL, save_game=RECORD_DIR)
 
 
 # Get screen size so that we can initialize layers correctly based on shape
@@ -489,6 +501,6 @@ dqn_training(num_episodes,
 if store_model:
     print('saving')
     date_time = datetime.now().strftime("%Y%d%Y-%H%M%S")
-    torch.save(target_net.state_dict(), f'models/target_net-{GAME_NAME}-{date_time}.pt')
-    torch.save(policy_net.state_dict(), f'models/policy_net-{GAME_NAME}-{date_time}.pt')
+    torch.save(target_net.state_dict(), os.path.join(MODEL_DIR, f'target_net-{GAME_NAME}-{date_time}.pt'))
+    torch.save(policy_net.state_dict(), os.path.join(MODEL_DIR, f'policy_net-{GAME_NAME}-{date_time}.pt'))
     print('saved')

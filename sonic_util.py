@@ -11,7 +11,7 @@ from math import log1p
 # from baselines.common.atari_wrappers import WarpFrame, FrameStack
 
 
-def make_env(game_name, game_level, save_game = True, scale_rew=True):
+def make_env(game_name, game_level, save_game = False, scale_rew=True):
     """
     Create an environment with some standard wrappers.
     """
@@ -87,6 +87,7 @@ class RewardScaler(gym.RewardWrapper):
         '''returns (log1p(reward), reward)
             rewards 1 for each step which happens to reward duration of game
         '''
+
         return (float(log1p(max(reward,1)) * 0.1), reward)
     
 
