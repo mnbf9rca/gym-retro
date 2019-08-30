@@ -30,7 +30,7 @@ from srsly import json_dumps
 
 num_episodes = 1500
 max_steps = 5000000  # per episode
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 REPLAY_CAPACITY = 5000
 GAMMA = 0.99
 EPS_START = 0.9
@@ -41,11 +41,11 @@ IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
-ROM_PATH = 'roms/'  # where to find ROMs
-RECORD_DIR = '.'  # where to save output BK2 files
+ROM_PATH = './roms'  # where to find ROMs
+RECORD_DIR = './bk2'  # where to save output BK2 files
 MODEL_DIR = "./models"  # where to store final model
-STATE_DIR = "."  # where to store game state files
-report_mean_score_over_n = 20
+STATE_DIR = "./gamestates"  # where to store game state files
+report_mean_score_over_n = 50
 # or None - bias random selection towards this value
 SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
 display_action = False
@@ -62,11 +62,19 @@ else:
 if os.path.isdir("/storage") & os.path.isdir("/artifacts"):
     # /storage and /artifacts both exist
     # these are special directories on paperspace
+    print("discovered /storage and /artifacts")
     ROM_PATH = '/storage/roms'
     RECORD_DIR = "/artifacts/bk2"
     MODEL_DIR = "/artifacts/models"
     STATE_DIR = "/artifacts/gamestates"
 
+print(
+    f'Saving to ROM_PATH="{ROM_PATH}", RECORD_DIR="{RECORD_DIR}", MODEL_DIR="{MODEL_DIR}", STATE_DIR="{STATE_DIR}"')
+print("creating RECORD_DIR, MODEL_DIR, STATE_DIR if they dont exist")
+
+os.makedirs(os.path.dirname(RECORD_DIR), exist_ok=True)
+os.makedirs(os.path.dirname(MODEL_DIR), exist_ok=True)
+os.makedirs(os.path.dirname(STATE_DIR), exist_ok=True)
 
 # Load ROMs
 install_games_from_rom_dir(ROM_PATH)
@@ -417,9 +425,8 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(f'{{"chart": "episode_duration", "y": {episode_time}, "x": {i_episode+1}}}')
                 print(
                     f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
-                filename = os.path.join(
-                    STATE_DIR, f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
-                os.makedirs(os.path.dirname(filename), exist_ok=True)
+                filename = os.path.join(STATE_DIR,
+                                        f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
                 with open(filename, "w") as f:
                     f.write(json_dumps(statememory))
                     f.close()
