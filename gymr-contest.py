@@ -431,7 +431,7 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
     # limit episides, steps on CPU i.e. when testing locally
-    num_episodes = 1
+    num_episodes = 3
     max_steps = 500
     store_model = False
     BATCH_SIZE = 8
