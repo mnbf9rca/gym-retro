@@ -7,17 +7,18 @@ adapted by mnbf9rca
 import gym
 import numpy as np
 import retro
+from math import log1p
 # from baselines.common.atari_wrappers import WarpFrame, FrameStack
 
 
-def make_env(game_name, game_level, scale_rew=True):
+def make_env(game_name, game_level, save_game = False, scale_rew=True):
     """
     Create an environment with some standard wrappers.
     """
     env = retro.make(
         game=game_name,  # Game
         state=game_level,  # Level / State
-        record=True)  # Record the Run
+        record=save_game)  # Record the Run
     env = SonicDiscretizer(env)
     if scale_rew:
         print("scaling rewards")
@@ -83,7 +84,13 @@ class RewardScaler(gym.RewardWrapper):
     """
 
     def reward(self, reward):
-        return reward * 0.1
+        '''returns (log1p(reward), reward)
+            rewards 1 for each step which happens to reward duration of game
+        '''
+
+        return (float(log1p(max(reward,1)) * 0.1), reward)
+    
+
 
 
 class AllowBacktracking(gym.Wrapper):

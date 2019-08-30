@@ -1,5 +1,0 @@
-gym>=0.14.0
-gym-retro>=0.7.0
-torchvision>=0.2.1
-Pillow>=5.2.0
-requests>=2.20.0

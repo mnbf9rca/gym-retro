@@ -25,28 +25,32 @@ import retro
 import os
 from support import save_frames_as_gif, install_games_from_rom_dir, download_and_unzip_rom_archive_from_url
 from sonic_util import make_env
-from torch.autograd import Variable # FQDN
+from torch.autograd import Variable  # FQDN
+from srsly import json_dumps
 
-num_episodes = 100
+num_episodes = 1500
 max_steps = 5000000  # per episode
 BATCH_SIZE = 64
 REPLAY_CAPACITY = 5000
-GAMMA = 0.999
+GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 50000  # how many steps does it take before EPS is zero? - across episodes...
+EPS_DECAY = 5000  # how many steps does it take before EPS is zero? - across episodes...
 TARGET_UPDATE = 10
 IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
+ROM_PATH = 'roms/'  # where to find ROMs
+RECORD_DIR = '.'  # where to save output BK2 files
+MODEL_DIR = "./models"  # where to store final model
+STATE_DIR = "."  # where to store game state files
+report_mean_score_over_n = 20
 # or None - bias random selection towards this value
-SELECT_ACTION_BIAS_LIST = [0.175, 0.3, 0.175, 0.175, 0.175]
+SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
 display_action = False
 
-
 # Before running the installation steps, we have to check the python version because `gym-retro` doesn't support Python 2.
-
 if sys.version_info[0] < 3:
     raise Exception("Gym Retro requires Python > 2")
 else:
@@ -54,17 +58,27 @@ else:
     print(sys.version_info)
 
 
-# Load ROMs
-DS_PATH = 'roms/'  # edit with your path/to/rom
+# check if running in paperspace
+if os.path.isdir("/storage") & os.path.isdir("/artifacts"):
+    # /storage and /artifacts both exist
+    # these are special directories on paperspace
+    ROM_PATH = '/storage/roms'
+    RECORD_DIR = "/artifacts/bk2"
+    MODEL_DIR = "/artifacts/models"
+    STATE_DIR = "/artifacts/gamestates"
 
-install_games_from_rom_dir(DS_PATH)
+
+# Load ROMs
+install_games_from_rom_dir(ROM_PATH)
+
 
 class FDQN(nn.Module):
     '''
     3 CNN + 2 FC layers
     from https://github.com/Shmuma/rl/blob/ptan/ptan/samples/dqn_expreplay_doom.py
-    input_shape=(1, 80, 80) (from source)
+    ideal input_shape=(1, 80, 80) (from source)
     '''
+
     def __init__(self, depth, height, width, n_actions):
         super(FDQN, self).__init__()
         self.conv1 = nn.Conv2d(depth, 32, 5)
@@ -100,10 +114,12 @@ class FDQN(nn.Module):
         # print("forward x", x)
         return x
 
+
 class DQN(nn.Module):
     '''
     3 or 5 layer CNN, no FC layers
     '''
+
     def __init__(self, depth, height, width, number_actions):
         super(DQN, self).__init__()
         self.input_width = width
@@ -151,7 +167,26 @@ class DQN(nn.Module):
         return x
 
 
+class scoreAverage(object):
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.memory = []
+        self.position = 0
+
+    def push(self, score):
+        """Saves a score."""
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        self.memory[self.position] = score
+        self.position = (self.position + 1) % self.capacity
+
+    def mean(self):
+        if len(self.memory) == 0:
+            return None
+        return float(sum(self.memory))/float(len(self.memory))
+
 # use replay to handle image transitions
+
 
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
@@ -313,6 +348,7 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
         if true, display the cartpole action in the notebook
         if false (default), display the episodes x durations graph
     """
+    score_history = scoreAverage(report_mean_score_over_n)
     for i_episode in range(num_episodes):
         # Initialize the environment and state
         env.reset()
@@ -322,17 +358,26 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
         # state = get_screen().to(device)
         total_reward = 0
         episode_start_time = datetime.now()
+        statememory = []
         for t in count():
+            # initialise state memory
+
             # Select and perform an action
             # action = select_action(state, SELECT_ACTION_BIAS_LIST)
             action = select_action(state, SELECT_ACTION_BIAS_LIST)
             # "action", action)
             if display_action:
                 print("action: ", action.squeeze())
-            _, reward, done, _ = env.step(action)
-            total_reward += reward * 10
+            _, reward, done, info = env.step(action)
 
-            reward = torch.tensor([reward], device=device)
+            # ('action', 'reward', 'info', 'done')
+            this_state = {"action": action.data[0].item(
+            ), "reward": reward[1], "scaled_reward": reward[0], "info": info, "done": done}
+
+            statememory.append(this_state)
+            total_reward += reward[1]
+
+            reward = torch.tensor([reward[0]], device=device)
 
             # Observe new state
             last_screen = current_screen
@@ -354,18 +399,31 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
             if done or t > max_steps:
                 episode_end_time = datetime.now()
                 episode_time = (episode_end_time - episode_start_time).total_seconds()
+                score_history.push(total_reward)
                 # floyd metrics
                 print(f'{{"metric": "score", "value": {total_reward}, "epoch": {i_episode+1}}}')
-                print(f'{{"metric": "total steps", "value": {steps_done}, "epoch": {i_episode+1}}}')
+                print(
+                    f'{{"metric": "rolling mean score", "value": {score_history.mean()}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "steps this episode", "value": {t}, "epoch": {i_episode+1}}}')
                 print(f'{{"metric": "episode duration", "value": {episode_time}, "epoch": {i_episode+1}}}')
-                print(f'{{"metric": "steps per second", "value": {float(t) / float(episode_time)}, "epoch": {i_episode+1}}}')
+                print(
+                    f'{{"metric": "steps per second", "value": {float(t) / float(episode_time)}, "epoch": {i_episode+1}}}')
+
                 # paperspace
                 # {"chart": "<identifier>", "y": <value>, "x": <value>}
                 print(f'{{"chart": "score", "y": {total_reward}, "x": {i_episode+1}}}')
+                print(f'{{"chart": "rolling_mean_score", "y": {score_history.mean()}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "steps_this_episode", "y": {t}, "x": {i_episode+1}}}')
                 print(f'{{"chart": "episode_duration", "y": {episode_time}, "x": {i_episode+1}}}')
-                print(f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
+                print(
+                    f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
+                game_history = json_dumps(statememory)
+                filename = os.path.join(
+                    STATE_DIR, f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
+                f = open(filename, "w")
+                f.write(game_history)
+                f.close()
+
                 break
 
         # Update the target network
@@ -384,9 +442,10 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
     # limit episides, steps on CPU i.e. when testing locally
-    num_episodes = 1
+    num_episodes = 3
     max_steps = 500
     store_model = False
+    RECORD_DIR = False
     BATCH_SIZE = 8
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"setting device to '{device}'")
@@ -399,7 +458,7 @@ except NameError:
 
 # create the environment
 # Loading the level
-env = make_env(GAME_NAME, LEVEL, True)
+env = make_env(GAME_NAME, LEVEL, save_game=RECORD_DIR)
 
 
 # Get screen size so that we can initialize layers correctly based on shape
@@ -427,6 +486,7 @@ steps_done = 0
 
 # charts for paperspace
 print('{"chart": "score", "axis": "epoch"}')
+print('{"chart": "rolling_mean_score", "axis": "epoch"}')
 print('{"chart": "steps_this_episode", "axis": "epoch"}')
 print('{"chart": "episode_duration", "axis": "epoch"}')
 print('{"chart": "steps_per_second", "axis": "epoch"}')
@@ -441,6 +501,8 @@ dqn_training(num_episodes,
 if store_model:
     print('saving')
     date_time = datetime.now().strftime("%Y%d%Y-%H%M%S")
-    torch.save(target_net.state_dict(), f'models/target_net-{GAME_NAME}-{date_time}.pt')
-    torch.save(policy_net.state_dict(), f'models/policy_net-{GAME_NAME}-{date_time}.pt')
+    torch.save(target_net.state_dict(), os.path.join(
+        MODEL_DIR, f'target_net-{GAME_NAME}-{date_time}.pt'))
+    torch.save(policy_net.state_dict(), os.path.join(
+        MODEL_DIR, f'policy_net-{GAME_NAME}-{date_time}.pt'))
     print('saved')
