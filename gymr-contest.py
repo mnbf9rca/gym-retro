@@ -81,6 +81,7 @@ def check_path_create_if_not(path):
         f.write('this is a test file')
         f.close()
     os.remove(filename)
+    print(f'... "{os.path.dirname(filename)}" is ok')
     
 
 
