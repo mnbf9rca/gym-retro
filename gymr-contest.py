@@ -439,7 +439,7 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(
                     f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
                 filename = os.path.join(STATE_DIR,
-                                        f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
+                                        f'gamedata-{GAME_NAME}-{LEVEL}-{(i_episode+1):06}.json')
                 print(f"Writing game history to '{filename}'")
                 with open(filename, "w") as f:
                     f.write(json_dumps(statememory))
@@ -451,7 +451,7 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
         if i_episode % TARGET_UPDATE == 0:
             target_net.load_state_dict(policy_net.state_dict())
 
-    print('Complete')
+    print('Completed training')
 
     # env.render(close=True)
     env.close()

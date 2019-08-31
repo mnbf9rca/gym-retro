@@ -71,7 +71,7 @@ class SonicDiscretizer(gym.ActionWrapper):
         '''
         print("Initializing actions")
         buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
-        actions = [['UP'], ['DOWN'], ['LEFT'], ['RIGHT'], ['X']]
+        actions = [['LEFT', 'X'], ['RIGHT', 'X'], ['LEFT'], ['RIGHT'], ['X']]
         self._actions = []
         for action in actions:
             arr = np.array([False] * 12)
