@@ -68,7 +68,7 @@ if os.path.isdir("/storage") & os.path.isdir("/artifacts"):
     MODEL_DIR = "/artifacts/models"
     STATE_DIR = "/artifacts/gamestates"
 
-print(f'Saving to ROM_PATH="{ROM_PATH}", '
+print(f'Saving to: ROM_PATH="{ROM_PATH}", '
       'RECORD_DIR="{RECORD_DIR}", '
       'MODEL_DIR="{MODEL_DIR}", '
       'STATE_DIR="{STATE_DIR}"')
