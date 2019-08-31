@@ -28,14 +28,14 @@ from sonic_util import make_env
 from torch.autograd import Variable  # FQDN
 from srsly import json_dumps
 
-num_episodes = 500
+num_episodes = 1500
 max_steps = 5000000  # per episode
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 REPLAY_CAPACITY = 5000
 GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 5000  # how many steps does it take before EPS is zero? - across episodes...
+EPS_DECAY = 30000  # how many steps does it take before EPS is zero? - across episodes...
 TARGET_UPDATE = 10
 IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'Airstriker-Genesis' # 'ChaseHQII-Genesis'
@@ -47,7 +47,7 @@ MODEL_DIR = "./models/"  # where to store final model
 STATE_DIR = "./gamestates/"  # where to store game state files
 report_mean_score_over_n = 50
 # or None - bias random selection towards this value
-SELECT_ACTION_BIAS_LIST = [0.2, 0.2, 0.2, 0.2, 0.2] # [0.125, 0.25, 0.125, 0.25, 0.25] (remove bias for airstriker)
+SELECT_ACTION_BIAS_LIST = [0.25, 0.25, 0.15, 0.15, 0.2] # [0.125, 0.25, 0.125, 0.25, 0.25] (remove bias for airstriker)
 display_action = False
 
 # Before running the installation steps, we have to check the python version because `gym-retro` doesn't support Python 2.
