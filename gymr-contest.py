@@ -28,7 +28,7 @@ from sonic_util import make_env
 from torch.autograd import Variable  # FQDN
 from srsly import json_dumps
 
-num_episodes = 1500
+num_episodes = 10
 max_steps = 5000000  # per episode
 BATCH_SIZE = 128
 REPLAY_CAPACITY = 5000
