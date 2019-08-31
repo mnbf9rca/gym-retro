@@ -88,3 +88,14 @@ def download_and_unzip_rom_archive_from_url(download_url, save_folder, loading_b
         full_temp_zip_filename = os.path.join(temp_dir, temp_zip_filename)
         download(download_url, full_temp_zip_filename, loading_bar=loading_bar)
         unzip(full_temp_zip_filename, save_folder, loading_bar=loading_bar)
+
+def get_available_state(GAME):
+    print('Available states for', GAME, 'game')
+    print('='*100)
+    if GAME in retro.data.list_games():
+
+        for state in retro.data.list_states(GAME):
+            print(state)
+
+    else:
+        print("No States available for", GAME, "- Please check if it's available in retro.list_games() list")

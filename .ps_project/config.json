@@ -4,6 +4,6 @@
   "container": "floydhub/pytorch:1.0.1-gpu.cuda9cudnn7-py3.42",
   "command": "cHl0aG9uIGd5bXItY29udGVzdC5weQ==",
   "workspace": "/Users/rob/Downloads/git/gym-retro",
-  "lastJobId": "js8f6bjejlalb7",
-  "name": "3CNN + 3FC, 80x80, float(log1p()*0.1) r0=1 r,diff, not det,g 0.99, EPS 5000, 500 it, adjusted bias"
+  "lastJobId": "jsfcdgkbjq1q74",
+  "name": "airstriker, 3CNN + 3FC, 80x80, float(log1p()*0.1) r0=1 r,diff, not det,g 0.99, EPS 5000, 150 it, adjusted bias"
 }

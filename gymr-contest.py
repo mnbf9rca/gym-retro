@@ -28,7 +28,7 @@ from sonic_util import make_env
 from torch.autograd import Variable  # FQDN
 from srsly import json_dumps
 
-num_episodes = 10
+num_episodes = 500
 max_steps = 5000000  # per episode
 BATCH_SIZE = 128
 REPLAY_CAPACITY = 5000
@@ -38,8 +38,8 @@ EPS_END = 0.05
 EPS_DECAY = 5000  # how many steps does it take before EPS is zero? - across episodes...
 TARGET_UPDATE = 10
 IMAGE_RESIZED_TO = 80  # squaere
-GAME_NAME = 'ChaseHQII-Genesis'
-LEVEL = 'Sports.DefaultSettings.Level1'
+GAME_NAME = 'Airstriker-Genesis' # 'ChaseHQII-Genesis'
+LEVEL = 'Level1'# 'Sports.DefaultSettings.Level1'
 store_model = True
 ROM_PATH = './roms/'  # where to find ROMs
 RECORD_DIR = './bk2/'  # where to save output BK2 files

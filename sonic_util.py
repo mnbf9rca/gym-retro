@@ -15,6 +15,7 @@ def make_env(game_name, game_level, save_game=False, scale_rew=True):
     """
     Create an environment with some standard wrappers.
     """
+    print(f"Creating game '{game_name}' on level '{game_level}' recording to '{save_game}'")
     env = retro.make(
         game=game_name,  # Game
         state=game_level,  # Level / State
