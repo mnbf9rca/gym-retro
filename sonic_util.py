@@ -7,6 +7,7 @@ from math import log1p
 import gym
 import numpy as np
 import retro
+from itertools import compress
 
 # from baselines.common.atari_wrappers import WarpFrame, FrameStack
 
@@ -42,7 +43,8 @@ class SonicDiscretizer(gym.ActionWrapper):
         originals from sonic
 
         buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
-        actions = [['LEFT'], ['RIGHT'], ['LEFT', 'DOWN'], ['RIGHT', 'DOWN'], ['DOWN'], ['DOWN', 'B'], ['B']]
+        actions = [['LEFT'], ['RIGHT'], ['LEFT', 'DOWN'], [
+            'RIGHT', 'DOWN'], ['DOWN'], ['DOWN', 'B'], ['B']]
         '''
 
         '''
@@ -55,18 +57,19 @@ class SonicDiscretizer(gym.ActionWrapper):
         B button: Accelerator
         C button: Turbo button- to activate a speed enhancement
 
-        Dpad: 
+        Dpad:
 
         Left: To move car to the left
         Right: To move car to the right
         UP and Down: Nothing changes on movement of the car
-        '''        
+        '''
         # buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
         # actions = [['A'], ['B'], ['C'], ['B', 'LEFT'], ['B', 'RIGHT']]
 
         '''
         AIRSTRIKER
         '''
+        print("Initializing actions")
         buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
         actions = [['UP'], ['DOWN'], ['LEFT'], ['RIGHT'], ['X']]
         self._actions = []
@@ -75,8 +78,9 @@ class SonicDiscretizer(gym.ActionWrapper):
             for button in action:
                 arr[buttons.index(button)] = True
             self._actions.append(arr)
-        self.action_space = gym.spaces.Discrete(len(self._actions))
-        print(f"Initialized {len(self._actions)} discrete actions.")
+            print("...", list(compress(buttons, arr)))
+        self.action_space=gym.spaces.Discrete(len(self._actions))
+        print("...", f"Initialized {len(self._actions)} discrete actions.")
 
     def action(self, a):  # pylint: disable=W0221
         return self._actions[a].copy()
@@ -108,17 +112,17 @@ class AllowBacktracking(gym.Wrapper):
 
     def __init__(self, env):
         super(AllowBacktracking, self).__init__(env)
-        self._cur_x = 0
-        self._max_x = 0
+        self._cur_x=0
+        self._max_x=0
 
     def reset(self, **kwargs):  # pylint: disable=E0202
-        self._cur_x = 0
-        self._max_x = 0
+        self._cur_x=0
+        self._max_x=0
         return self.env.reset(**kwargs)
 
     def step(self, action):  # pylint: disable=E0202
-        obs, rew, done, info = self.env.step(action)
+        obs, rew, done, info=self.env.step(action)
         self._cur_x += rew
-        rew = max(0, self._cur_x - self._max_x)
-        self._max_x = max(self._max_x, self._cur_x)
+        rew=max(0, self._cur_x - self._max_x)
+        self._max_x=max(self._max_x, self._cur_x)
         return obs, rew, done, info

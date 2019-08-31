@@ -47,7 +47,7 @@ MODEL_DIR = "./models/"  # where to store final model
 STATE_DIR = "./gamestates/"  # where to store game state files
 report_mean_score_over_n = 50
 # or None - bias random selection towards this value
-SELECT_ACTION_BIAS_LIST = None # [0.125, 0.25, 0.125, 0.25, 0.25] (remove bias for airstriker)
+SELECT_ACTION_BIAS_LIST = [0.2, 0.2, 0.2, 0.2, 0.2] # [0.125, 0.25, 0.125, 0.25, 0.25] (remove bias for airstriker)
 display_action = False
 
 # Before running the installation steps, we have to check the python version because `gym-retro` doesn't support Python 2.
