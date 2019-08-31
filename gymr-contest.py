@@ -41,18 +41,18 @@ IMAGE_RESIZED_TO = 80  # squaere
 GAME_NAME = 'ChaseHQII-Genesis'
 LEVEL = 'Sports.DefaultSettings.Level1'
 store_model = True
-ROM_PATH = './roms'  # where to find ROMs
-RECORD_DIR = './bk2'  # where to save output BK2 files
-MODEL_DIR = "./models"  # where to store final model
-STATE_DIR = "./gamestates"  # where to store game state files
+ROM_PATH = './roms/'  # where to find ROMs
+RECORD_DIR = './bk2/'  # where to save output BK2 files
+MODEL_DIR = "./models/"  # where to store final model
+STATE_DIR = "./gamestates/"  # where to store game state files
 report_mean_score_over_n = 50
 # or None - bias random selection towards this value
 SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
 display_action = False
 
 # Before running the installation steps, we have to check the python version because `gym-retro` doesn't support Python 2.
-if sys.version_info[0] < 3:
-    raise Exception("Gym Retro requires Python > 2")
+if ((sys.version_info[0] == 3) & (sys.version_info[1] < 6)) or (sys.version_info[0] < 3):
+    raise Exception("Gym Retro requires Python >= 3.6")
 else:
     print('Your python version is OK.')
     print(sys.version_info)
@@ -68,13 +68,19 @@ if os.path.isdir("/storage") & os.path.isdir("/artifacts"):
     MODEL_DIR = "/artifacts/models"
     STATE_DIR = "/artifacts/gamestates"
 
-print(
-    f'Saving to ROM_PATH="{ROM_PATH}", RECORD_DIR="{RECORD_DIR}", MODEL_DIR="{MODEL_DIR}", STATE_DIR="{STATE_DIR}"')
-print("creating RECORD_DIR, MODEL_DIR, STATE_DIR if they dont exist")
+print(f'Saving to ROM_PATH="{ROM_PATH}", '
+      'RECORD_DIR="{RECORD_DIR}", '
+      'MODEL_DIR="{MODEL_DIR}", '
+      'STATE_DIR="{STATE_DIR}"')
 
-os.makedirs(os.path.dirname(RECORD_DIR), exist_ok=True)
-os.makedirs(os.path.dirname(MODEL_DIR), exist_ok=True)
-os.makedirs(os.path.dirname(STATE_DIR), exist_ok=True)
+print("creating RECORD_DIR, MODEL_DIR, STATE_DIR if they dont exist")
+def check_path_create_if_not(path):
+    os.makedirs(os.path.dirname(os.path.join(path,'dummy_file')), exist_ok=True)
+
+
+check_path_create_if_not(RECORD_DIR)
+check_path_create_if_not(MODEL_DIR)
+check_path_create_if_not(STATE_DIR)
 
 # Load ROMs
 install_games_from_rom_dir(ROM_PATH)
