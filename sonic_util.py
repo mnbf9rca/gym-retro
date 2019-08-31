@@ -46,6 +46,7 @@ class SonicDiscretizer(gym.ActionWrapper):
         '''
 
         '''
+        CHASE HQ
         lookimng at https://gamefaqs.gamespot.com/genesis/586101-chase-hq-ii/faqs/16869
         keys are:
         Buttons:
@@ -59,9 +60,15 @@ class SonicDiscretizer(gym.ActionWrapper):
         Left: To move car to the left
         Right: To move car to the right
         UP and Down: Nothing changes on movement of the car
+        '''        
+        # buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
+        # actions = [['A'], ['B'], ['C'], ['B', 'LEFT'], ['B', 'RIGHT']]
+
+        '''
+        AIRSTRIKER
         '''
         buttons = ["B", "A", "MODE", "START", "UP", "DOWN", "LEFT", "RIGHT", "C", "Y", "X", "Z"]
-        actions = [['A'], ['B'], ['C'], ['B', 'LEFT'], ['B', 'RIGHT']]
+        actions = [['UP'], ['DOWN'], ['LEFT'], ['RIGHT'], ['X']]
         self._actions = []
         for action in actions:
             arr = np.array([False] * 12)
