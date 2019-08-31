@@ -73,9 +73,15 @@ print(f'Saving to ROM_PATH="{ROM_PATH}", '
       'MODEL_DIR="{MODEL_DIR}", '
       'STATE_DIR="{STATE_DIR}"')
 
-print("creating RECORD_DIR, MODEL_DIR, STATE_DIR if they dont exist")
+print("creating RECORD_DIR, MODEL_DIR, STATE_DIR if they dont exist and checking they're writeable")
 def check_path_create_if_not(path):
     os.makedirs(os.path.dirname(os.path.join(path,'dummy_file')), exist_ok=True)
+    filename = os.path.join(path, 'dummy_file')
+    with open(filename, "w") as f:
+        f.write('this is a test file')
+        f.close()
+    os.remove(filename)
+    
 
 
 check_path_create_if_not(RECORD_DIR)
