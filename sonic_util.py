@@ -95,7 +95,7 @@ class RewardScaler(gym.RewardWrapper):
             rewards 1 for each step which happens to reward duration of game
         '''
 
-        return (float(log1p(max(reward, 1)) * 0.1), reward)
+        return (float(log1p(max(reward, 1))), reward)
 
 
 class AllowBacktracking(gym.Wrapper):
