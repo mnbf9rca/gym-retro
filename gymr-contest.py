@@ -28,31 +28,31 @@ from sonic_util import make_env
 from torch.autograd import Variable  # FQDN
 from srsly import json_dumps
 
-num_episodes = 1500
+num_episodes = 150
 max_steps = 5000000  # per episode
-BATCH_SIZE = 128
+BATCH_SIZE = 256
 REPLAY_CAPACITY = 5000
-GAMMA = 0.99
+GAMMA = 0.90
 EPS_START = 0.9
 EPS_END = 0.05
-EPS_DECAY = 5000  # how many steps does it take before EPS is zero? - across episodes...
-TARGET_UPDATE = 10
-IMAGE_RESIZED_TO = 80  # squaere
-GAME_NAME = 'ChaseHQII-Genesis'
-LEVEL = 'Sports.DefaultSettings.Level1'
+EPS_DECAY = 30000  # how many steps does it take before EPS is zero? - across episodes...
+TARGET_UPDATE = 100
+IMAGE_RESIZED_TO = 160  # squaere
+GAME_NAME = 'Airstriker-Genesis' # 'ChaseHQII-Genesis'
+LEVEL = 'Level1'# 'Sports.DefaultSettings.Level1'
 store_model = True
-ROM_PATH = './roms'  # where to find ROMs
-RECORD_DIR = './bk2'  # where to save output BK2 files
-MODEL_DIR = "./models"  # where to store final model
-STATE_DIR = "./gamestates"  # where to store game state files
+ROM_PATH = './roms/'  # where to find ROMs
+RECORD_DIR = './bk2/'  # where to save output BK2 files
+MODEL_DIR = "./models/"  # where to store final model
+STATE_DIR = "./gamestates/"  # where to store game state files
 report_mean_score_over_n = 50
 # or None - bias random selection towards this value
-SELECT_ACTION_BIAS_LIST = [0.125, 0.25, 0.125, 0.25, 0.25]
+SELECT_ACTION_BIAS_LIST = [0.25, 0.25, 0.15, 0.15, 0.2] # [0.125, 0.25, 0.125, 0.25, 0.25] (remove bias for airstriker)
 display_action = False
 
 # Before running the installation steps, we have to check the python version because `gym-retro` doesn't support Python 2.
-if sys.version_info[0] < 3:
-    raise Exception("Gym Retro requires Python > 2")
+if ((sys.version_info[0] == 3) & (sys.version_info[1] < 6)) or (sys.version_info[0] < 3):
+    raise Exception("Gym Retro requires Python >= 3.6")
 else:
     print('Your python version is OK.')
     print(sys.version_info)
@@ -68,13 +68,26 @@ if os.path.isdir("/storage") & os.path.isdir("/artifacts"):
     MODEL_DIR = "/artifacts/models"
     STATE_DIR = "/artifacts/gamestates"
 
-print(
-    f'Saving to ROM_PATH="{ROM_PATH}", RECORD_DIR="{RECORD_DIR}", MODEL_DIR="{MODEL_DIR}", STATE_DIR="{STATE_DIR}"')
-print("creating RECORD_DIR, MODEL_DIR, STATE_DIR if they dont exist")
+print(f'Saving to: ROM_PATH="{ROM_PATH}", '
+      'RECORD_DIR="{RECORD_DIR}", '
+      'MODEL_DIR="{MODEL_DIR}", '
+      'STATE_DIR="{STATE_DIR}"')
 
-os.makedirs(os.path.dirname(RECORD_DIR), exist_ok=True)
-os.makedirs(os.path.dirname(MODEL_DIR), exist_ok=True)
-os.makedirs(os.path.dirname(STATE_DIR), exist_ok=True)
+print("creating RECORD_DIR, MODEL_DIR, STATE_DIR if they dont exist and checking they're writeable")
+def check_path_create_if_not(path):
+    filename = os.path.join(path, 'dummy_file')
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, "w") as f:
+        f.write('this is a test file')
+        f.close()
+    os.remove(filename)
+    print(f'... "{os.path.dirname(filename)}" is ok')
+    
+
+
+check_path_create_if_not(RECORD_DIR)
+check_path_create_if_not(MODEL_DIR)
+check_path_create_if_not(STATE_DIR)
 
 # Load ROMs
 install_games_from_rom_dir(ROM_PATH)
@@ -426,7 +439,8 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
                 print(
                     f'{{"chart": "steps_per_second", "y": {float(t) / float(episode_time)}, "x": {i_episode+1}}}')
                 filename = os.path.join(STATE_DIR,
-                                        f'gamedata-{GAME_NAME}-{LEVEL}-{i_episode+1}.json')
+                                        f'gamedata-{GAME_NAME}-{LEVEL}-{(i_episode+1):06}.json')
+                print(f"Writing game history to '{filename}'")
                 with open(filename, "w") as f:
                     f.write(json_dumps(statememory))
                     f.close()
@@ -437,7 +451,7 @@ def dqn_training(num_episodes, max_steps=500, display_action=False):
         if i_episode % TARGET_UPDATE == 0:
             target_net.load_state_dict(policy_net.state_dict())
 
-    print('Complete')
+    print('Completed training')
 
     # env.render(close=True)
     env.close()
